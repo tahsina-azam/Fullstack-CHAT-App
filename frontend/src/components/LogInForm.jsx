@@ -1,15 +1,91 @@
 import React from "react";
 import "../styles/LogInSignUp.css";
+import axios from "axios";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   MDBBtn,
   MDBContainer,
   MDBCard,
   MDBCardBody,
   MDBInput,
-  MDBCheckbox,
 } from "mdb-react-ui-kit";
+import toast, { Toaster } from "react-hot-toast";
 
 function App() {
+  const [email, setEmail] = useState();
+  const [password, setPassword] = useState();
+  const navigate = useNavigate();
+
+  const submitHandler = async () => {
+    if (!email || !password) {
+      toast("Check if all the fields are filled up correctly.", {
+        duration: 4000,
+        position: "top-center",
+
+        icon: "❌",
+
+        iconTheme: {
+          primary: "#000",
+          secondary: "#fff",
+        },
+        ariaProps: {
+          role: "status",
+          "aria-live": "polite",
+        },
+      });
+
+      return;
+    }
+
+    try {
+      const config = {
+        headers: {
+          "Content-type": "application/json",
+        },
+      };
+
+      const response = await axios.post(
+        "http://localhost:8000/api/user/login",
+        { email: email, password: password },
+        config,
+      );
+      toast("Successfully Account Creation", {
+        duration: 4000,
+        position: "top-center",
+
+        icon: "👏",
+
+        iconTheme: {
+          primary: "#000",
+          secondary: "#fff",
+        },
+        ariaProps: {
+          role: "status",
+          "aria-live": "polite",
+        },
+      });
+      localStorage.setItem("token", JSON.stringify(response.data));
+      navigate("/chat");
+    } catch (error) {
+      toast("Error Occured", {
+        duration: 4000,
+        position: "top-center",
+
+        icon: "❌",
+
+        iconTheme: {
+          primary: "#000",
+          secondary: "#fff",
+        },
+        ariaProps: {
+          role: "status",
+          "aria-live": "polite",
+        },
+      });
+    }
+  };
+
   return (
     <MDBContainer fluid>
       <div
@@ -32,33 +108,27 @@ function App() {
           }}
         >
           <MDBCardBody className="p-5 text-center">
-            <h2 className="fw-bold mb-5">Sign up now</h2>
+            <h2 className="fw-bold mb-5">Sign in now</h2>
 
             <MDBInput
               wrapperClass="mb-4"
               label="Email"
               id="form1"
               type="email"
+              onChange={(e) => setEmail(e.target.value)}
             />
             <MDBInput
               wrapperClass="mb-4"
               label="Password"
               id="form1"
               type="password"
+              onChange={(e) => setPassword(e.target.value)}
             />
 
-            <div className="d-flex justify-content-center mb-4">
-              <MDBCheckbox
-                name="flexCheck"
-                value=""
-                id="flexCheckDefault"
-                label="Subscribe to our newsletter"
-              />
-            </div>
-
-            <MDBBtn className="w-100 mb-4" size="md">
+            <MDBBtn className="w-100 mb-4" size="md" onClick={submitHandler}>
               sign in
             </MDBBtn>
+            <Toaster />
 
             <div className="text-center">
               <a href="/signup">

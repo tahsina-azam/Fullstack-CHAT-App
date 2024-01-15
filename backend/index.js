@@ -2,7 +2,10 @@ import express, { json } from "express";
 import connectDB from "./db.js";
 import { config } from "dotenv";
 import userRoutes from "./routes/userRoutes.js";
-//import chatRoutes from "./routes/chatRoutes.js";
+import cors from "cors"
+import { Server } from "socket.io";
+import http from "http"
+import chatRoutes from "./routes/chatRoutes.js";
 
 
 config();
@@ -10,14 +13,27 @@ connectDB();
 const app = express();
 const PORT = process.env.PORT;
 
+app.use(cors())
+
 app.use(json()); // to accept json data
 
 app.get("/", (req, res) => {
   res.send("API Running!");
 });
 
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+  );
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE');
+
+  next();
+});
+
 app.use("/api/user", userRoutes);
-//app.use("/api/chat", chatRoutes);
+app.use("/api/chat", chatRoutes);
 
 
 const server = app.listen(
@@ -26,71 +42,63 @@ const server = app.listen(
 );
 
 
-// --------------------------deployment------------------------------
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+  }
+});
 
-// const __dirname1 = path.resolve();
+io.on("connection", (socket) => {
+  console.log("Connected to socket.io");
+  socket.on("setup", (userData) => {
+    socket.join(userData._id);
+    socket.emit("connected");
+  });
 
-// if (process.env.NODE_ENV === "production") {
-//   app.use(express.static(path.join(__dirname1, "/frontend/build")));
+  socket.on("typing", (room) => socket.in(room).emit("typing"));
+  socket.on("stop typing", (room) => socket.in(room).emit("stop typing"));
 
-//   app.get("*", (req, res) =>
-//     res.sendFile(path.resolve(__dirname1, "frontend", "build", "index.html"))
-//   );
-// } else {
-//   app.get("/", (req, res) => {
-//     res.send("API is running..");
-//   });
-// }
+  socket.on("join chat", (room) => {
+    socket.join(room);
+    console.log("User Joined Room: " + room);
+  });
+  socket.on("typing", (room) => socket.in(room).emit("typing"));
+  socket.on("stop typing", (room) => socket.in(room).emit("stop typing"));
 
-// // --------------------------deployment------------------------------
+  socket.on("new message", (newMessageRecieved) => {
+    console.log(newMessageRecieved)
+    var chat = newMessageRecieved.chat;
 
-// // Error Handling middlewares
-// app.use(notFound);
-// app.use(errorHandler);
+    if (!chat.users) return console.log("chat.users not defined");
 
-// const PORT = process.env.PORT;
+    chat.users.forEach((user) => {
+      if (user._id == newMessageRecieved.sender._id) return;
+      console.log(user._id, newMessageRecieved.sender._id)
+      // socket.to("32").emit("receive_message", newMessageRecieved);
+      // socket.broadcast.emit("receive_message",newMessageRecieved)
+      // socket.emit("receive_message", newMessageRecieved)
+    });
+  });
 
-// const server = app.listen(
-//   PORT,
-//   console.log(`Server running on PORT ${PORT}...`.yellow.bold)
-// );
+  socket.on("send_message", (data) => {
+    socket.to('5').emit("receive_message", data);
+  });
 
-// const io = require("socket.io")(server, {
-//   pingTimeout: 60000,
-//   cors: {
-//     origin: "http://localhost:3000",
-//     // credentials: true,
-//   },
-// });
+  socket.off("setup", () => {
+    console.log("USER DISCONNECTED");
+    socket.leave(userData._id);
+  });
+});
 
 // io.on("connection", (socket) => {
-//   console.log("Connected to socket.io");
-//   socket.on("setup", (userData) => {
-//     socket.join(userData._id);
-//     socket.emit("connected");
+//   console.log(`User Connected: ${socket.id}`);
+
+//   socket.on("join_room", (data) => {
+//     socket.join(data);
 //   });
 
-//   socket.on("join chat", (room) => {
-//     socket.join(room);
-//     console.log("User Joined Room: " + room);
-//   });
-//   socket.on("typing", (room) => socket.in(room).emit("typing"));
-//   socket.on("stop typing", (room) => socket.in(room).emit("stop typing"));
-
-//   socket.on("new message", (newMessageRecieved) => {
-//     var chat = newMessageRecieved.chat;
-
-//     if (!chat.users) return console.log("chat.users not defined");
-
-//     chat.users.forEach((user) => {
-//       if (user._id == newMessageRecieved.sender._id) return;
-
-//       socket.in(user._id).emit("message recieved", newMessageRecieved);
-//     });
-//   });
-
-//   socket.off("setup", () => {
-//     console.log("USER DISCONNECTED");
-//     socket.leave(userData._id);
+//   socket.on("send_message", (data) => {
+//     socket.to(data.room).emit("receive_message", data);
 //   });
 // });
+
